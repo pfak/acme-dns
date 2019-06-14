@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/go-sql-library/mysql"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -31,6 +32,14 @@ var userTable = `
         Password TEXT UNIQUE NOT NULL,
         Subdomain TEXT UNIQUE NOT NULL,
 		AllowFrom TEXT
+	);`
+
+var userTableMY = `
+	CREATE TABLE IF NOT EXISTS records(
+        Username VARCHAR(45) UNIQUE NOT NULL PRIMARY KEY,
+        Password VARCHAR(40) UNIQUE NOT NULL,
+        Subdomain VARCHAR(63) UNIQUE NOT NULL,
+		AllowFrom TEXT
     );`
 
 var txtTable = `
@@ -45,6 +54,14 @@ var txtTablePG = `
 		rowid SERIAL,
 		Subdomain TEXT NOT NULL,
 		Value   TEXT NOT NULL DEFAULT '',
+		LastUpdate INT
+	);`
+
+var txtTableMY = `
+    CREATE TABLE IF NOT EXISTS txt(
+		rowid SERIAL,
+		Subdomain TEXT NOT NULL,
+		Value   TEXT NOT NULL,
 		LastUpdate INT
 	);`
 
@@ -69,9 +86,15 @@ func (d *acmedb) Init(engine string, connection string) error {
 		versionString = "0"
 	}
 	_, err = d.DB.Exec(acmeTable)
-	_, err = d.DB.Exec(userTable)
+	if Config.Database.Engine == "mysql" {
+		_, err = d.DB.Exec(userTableMY)
+	} else {
+		_, err = d.DB.Exec(userTable)
+	}
 	if Config.Database.Engine == "sqlite3" {
 		_, err = d.DB.Exec(txtTable)
+	} else if Config.Database.Engine == "mysql" {
+		_, err = d.DB.Exec(txtTableMY)
 	} else {
 		_, err = d.DB.Exec(txtTablePG)
 	}
@@ -153,7 +176,7 @@ func (d *acmedb) handleDBUpgradeTo1() error {
 		}
 	}
 	// SQLite doesn't support dropping columns
-	if Config.Database.Engine != "sqlite3" {
+	if Config.Database.Engine != "sqlite3" && Config.Database.Engine != "mysql"  {
 		_, _ = tx.Exec("ALTER TABLE records DROP COLUMN IF EXISTS Value")
 		_, _ = tx.Exec("ALTER TABLE records DROP COLUMN IF EXISTS LastActive")
 	}
@@ -193,7 +216,7 @@ func (d *acmedb) Register(afrom cidrslice) (ACMETxt, error) {
         Subdomain,
 		AllowFrom) 
         values($1, $2, $3, $4)`
-	if Config.Database.Engine == "sqlite3" {
+	if Config.Database.Engine == "sqlite3" || Config.Database.Engine == "mysql" {
 		regSQL = getSQLiteStmt(regSQL)
 	}
 	sm, err := tx.Prepare(regSQL)
@@ -218,7 +241,7 @@ func (d *acmedb) GetByUsername(u uuid.UUID) (ACMETxt, error) {
 	FROM records
 	WHERE Username=$1 LIMIT 1
 	`
-	if Config.Database.Engine == "sqlite3" {
+	if Config.Database.Engine == "sqlite3" || Config.Database.Engine == "mysql" {
 		getSQL = getSQLiteStmt(getSQL)
 	}
 
@@ -255,7 +278,7 @@ func (d *acmedb) GetTXTForDomain(domain string) ([]string, error) {
 	getSQL := `
 	SELECT Value FROM txt WHERE Subdomain=$1 LIMIT 2
 	`
-	if Config.Database.Engine == "sqlite3" {
+	if Config.Database.Engine == "sqlite3" || Config.Database.Engine == "mysql" {
 		getSQL = getSQLiteStmt(getSQL)
 	}
 
@@ -293,7 +316,7 @@ func (d *acmedb) Update(a ACMETxtPost) error {
 	WHERE rowid=(
 		SELECT rowid FROM txt WHERE Subdomain=$3 ORDER BY LastUpdate LIMIT 1)
 	`
-	if Config.Database.Engine == "sqlite3" {
+	if Config.Database.Engine == "sqlite3" || Config.Database.Engine == "mysql" {
 		updSQL = getSQLiteStmt(updSQL)
 	}
 
