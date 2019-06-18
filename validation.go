@@ -5,6 +5,8 @@ import (
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func getValidUsername(u string) (uuid.UUID, error) {
@@ -44,6 +46,9 @@ func validTXT(s string) bool {
 func correctPassword(pw string, hash string) bool {
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)); err == nil {
 		return true
+	} else {
+		log.WithFields(log.Fields{"error": err.Error()}).Error("bcrypt CompareHashAndPassword")
 	}
+
 	return false
 }
