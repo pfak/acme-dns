@@ -37,7 +37,7 @@ var userTable = `
 var userTableMY = `
 	CREATE TABLE IF NOT EXISTS records(
         Username VARCHAR(45) UNIQUE NOT NULL PRIMARY KEY,
-        Password VARCHAR(40) UNIQUE NOT NULL,
+        Password VARCHAR(60) UNIQUE NOT NULL,
         Subdomain VARCHAR(63) UNIQUE NOT NULL,
 		AllowFrom TEXT
     );`
