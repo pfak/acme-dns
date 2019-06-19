@@ -316,7 +316,14 @@ func (d *acmedb) Update(a ACMETxtPost) error {
 	WHERE rowid=(
 		SELECT rowid FROM txt WHERE Subdomain=$3 ORDER BY LastUpdate LIMIT 1)
 	`
-	if Config.Database.Engine == "sqlite3" || Config.Database.Engine == "mysql" {
+
+	if Config.Database.Engine == "mysql" {
+		updSQL = `
+		UPDATE txt SET Value=?, LastUpdate=?
+		WHERE rowid=(
+			SELECT * FROM (SELECT rowid FROM txt WHERE Subdomain=? ORDER BY LastUpdate LIMIT 1) AS rowid)
+		`
+	} else if Config.Database.Engine == "sqlite3" {
 		updSQL = getSQLiteStmt(updSQL)
 	}
 
